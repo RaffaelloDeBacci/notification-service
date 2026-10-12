@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: qualifyze-notification-service
+  banner:
+    location: classpath:Banner.txt
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/notification}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+
+  metrics:
+    distribution:
+      percentiles-histogram:
+        notification:
+          dispatch:
+            latency: true
+
+notification:
+  inbox:
+    worker:
+      # Must exceed the worst-case delivery of a single target
+      # (dispatch.retry.max-attempts × channel timeout + backoff); renewed after each target.
+      lease: ${NOTIFICATION_INBOX_WORKER_LEASE:PT5M}
+      max-claims: ${NOTIFICATION_INBOX_WORKER_MAX_CLAIMS:5}
+  dispatch:
+    retry:
+      max-attempts: ${NOTIFICATION_DISPATCH_RETRY_MAX_ATTEMPTS:3}
+      initial-backoff-ms: ${NOTIFICATION_DISPATCH_RETRY_INITIAL_BACKOFF_MS:200}
+  channel:
+    email:
+      from: ${NOTIFICATION_CHANNEL_EMAIL_FROM:no-reply@qualifyze.local}
+      host: ${NOTIFICATION_CHANNEL_EMAIL_HOST:localhost}
+      port: ${NOTIFICATION_CHANNEL_EMAIL_PORT:1025}
+      username: ${NOTIFICATION_CHANNEL_EMAIL_USERNAME:}
+      password: ${NOTIFICATION_CHANNEL_EMAIL_PASSWORD:}
+      auth: ${NOTIFICATION_CHANNEL_EMAIL_AUTH:false}
+      starttls: ${NOTIFICATION_CHANNEL_EMAIL_STARTTLS:false}
+      timeout: ${NOTIFICATION_CHANNEL_EMAIL_TIMEOUT:10s}
+    #Just for showing up the flexibility of the design
+    slack:
+      enabled: ${NOTIFICATION_CHANNEL_SLACK_ENABLED:false}
+      client-id: ${NOTIFICATION_CHANNEL_SLACK_CLIENT_ID:}
+      client-secret: ${NOTIFICATION_CHANNEL_SLACK_CLIENT_SECRET:}
+      signing-secret: ${NOTIFICATION_CHANNEL_SLACK_SIGNING_SECRET:}
+      api-base-url: ${NOTIFICATION_CHANNEL_SLACK_API_BASE_URL:https://slack.com/api}
+
+  audit:
+    broker: ${NOTIFICATION_AUDIT_BROKER:sns}
+    aws:
+      region: ${NOTIFICATION_AUDIT_AWS_REGION:us-east-1}
+      endpoint: ${NOTIFICATION_AUDIT_AWS_ENDPOINT:http://localhost:4566}
+      access-key: ${NOTIFICATION_AUDIT_AWS_ACCESS_KEY:test}
+      secret-key: ${NOTIFICATION_AUDIT_AWS_SECRET_KEY:test}
+    sns:
+      topic-arn: ${NOTIFICATION_AUDIT_SNS_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:notification-audit-events}
+      message-group-id: ${NOTIFICATION_AUDIT_SNS_MESSAGE_GROUP_ID:notification-service}

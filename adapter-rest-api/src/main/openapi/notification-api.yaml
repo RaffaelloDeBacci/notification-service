@@ -1,0 +1,61 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  version: 1.0.0
+  description: >-
+    Internal notification ingestion and distribution-list service.
+
+
+    ## Security
+
+
+    This API is **not exposed to the public internet**. Authentication,
+    authorization and transport encryption are enforced **out-of-band** at the
+    infrastructure layer, not by the application:
+
+
+    - **Network isolation** — Kubernetes `NetworkPolicy` allow-lists restrict
+      which workloads may reach this service.
+
+    - **Workload identity & encryption** — mutual TLS provided transparently by
+      the service mesh (SPIFFE/SVID identities); unauthenticated callers are
+      rejected at the mesh before reaching the application.
+
+
+    Because authentication is terminated upstream, the application itself never
+    issues `401 Unauthorized` or `403 Forbidden`, and no API-level security
+    scheme is defined (see the empty `security` requirement below). Should the
+    service ever be fronted by a gateway for external exposure, add an explicit
+    `securitySchemes` entry and reinstate the corresponding responses.
+security: []
+paths:
+  /api/v1/notifications:
+    $ref: './paths/notifications.yaml'
+  /api/v1/customers/{customerReference}/distribution-list:
+    $ref: './paths/distribution-list.yaml'
+components:
+  schemas:
+    MessageType:
+      $ref: './components/schemas/notifications.yaml#/MessageType'
+    IngestNotificationRequest:
+      $ref: './components/schemas/notifications.yaml#/IngestNotificationRequest'
+    RegulatoryEventIngestRequest:
+      $ref: './components/schemas/notifications.yaml#/RegulatoryEventIngestRequest'
+    CertificateExpiryIngestRequest:
+      $ref: './components/schemas/notifications.yaml#/CertificateExpiryIngestRequest'
+    ProcessNotificationResponse:
+      $ref: './components/schemas/notifications.yaml#/ProcessNotificationResponse'
+    DistributionListChannel:
+      $ref: './components/schemas/distribution-list.yaml#/DistributionListChannel'
+    DistributionListTargetRequest:
+      $ref: './components/schemas/distribution-list.yaml#/DistributionListTargetRequest'
+    UpsertDistributionListRequest:
+      $ref: './components/schemas/distribution-list.yaml#/UpsertDistributionListRequest'
+    DistributionListTargetResponse:
+      $ref: './components/schemas/distribution-list.yaml#/DistributionListTargetResponse'
+    DistributionListResponse:
+      $ref: './components/schemas/distribution-list.yaml#/DistributionListResponse'
+    ErrorReason:
+      $ref: './components/schemas/errors.yaml#/ErrorReason'
+    ErrorResponse:
+      $ref: './components/schemas/errors.yaml#/ErrorResponse'

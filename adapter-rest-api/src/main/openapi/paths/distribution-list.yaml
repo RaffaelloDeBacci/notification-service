@@ -1,0 +1,59 @@
+put:
+  tags:
+    - DistributionList
+  operationId: upsertDistributionList
+  summary: Create or update preferred distribution list for a customer
+  parameters:
+    - in: path
+      name: customerReference
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    - in: header
+      name: X-Actor
+      required: false
+      description: >-
+        Person behind the change (the user logged in to the BFF). Recorded as
+        the actor of the audit events.
+      schema:
+        type: string
+        maxLength: 128
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/distribution-list.yaml#/UpsertDistributionListRequest'
+  responses:
+    '200':
+      description: Distribution list saved
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/distribution-list.yaml#/DistributionListResponse'
+    '400':
+      description: Invalid request payload
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'
+    '422':
+      description: Semantic validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'
+    '503':
+      description: Required dependency unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'

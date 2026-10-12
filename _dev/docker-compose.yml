@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: qualifyze-notification-postgres
+    environment:
+      POSTGRES_DB: notification
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notification"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  localstack:
+    image: localstack/localstack:4.0.3
+    container_name: qualifyze-notification-localstack
+    environment:
+      SERVICES: sns,sqs
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./localstack/init/01-create-audit-topology.sh:/etc/localstack/init/ready.d/01-create-audit-topology.sh
+  mailpit:
+    image: axllent/mailpit:v1.22.3
+    container_name: qualifyze-notification-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_SMTP_BIND_ADDR: 0.0.0.0:1025
+      MP_UI_BIND_ADDR: 0.0.0.0:8025
+
+volumes:
+  postgres_data:

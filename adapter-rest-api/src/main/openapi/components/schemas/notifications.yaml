@@ -1,0 +1,182 @@
+MessageType:
+  type: string
+  description: Discriminator identifying the notification payload schema.
+  enum:
+    - REGULATORY_EVENT
+    - CERTIFICATE_EXPIRY
+  example: REGULATORY_EVENT
+
+IngestNotificationRequest:
+  type: object
+  description: >-
+    Polymorphic base for every notification request. Carries the common
+    envelope fields (idempotencyKey, messageType, site, affected customers)
+    and uses messageType as a
+    discriminator to select the concrete variant. Variants compose this base
+    via allOf, so the type-specific schemas stay DRY while the generated code
+    keeps a single stable base type (IngestNotificationRequest) for the
+    controller and request mapper.
+  required:
+    - idempotencyKey
+    - messageType
+    - siteName
+    - siteAddress
+    - affectedCustomerReferences
+  properties:
+    idempotencyKey:
+      type: string
+      minLength: 1
+      maxLength: 255
+      description: >-
+        Client-generated key that uniquely identifies this request. Retries
+        carrying the same key are de-duplicated: the original outcome is
+        returned instead of creating a new notification.
+      example: 7f3c2b10-5d9a-4a1e-8f2b-1c9d4e6a0b11
+    messageType:
+      $ref: '#/MessageType'
+    siteName:
+      type: string
+      minLength: 1
+      maxLength: 255
+      description: Human-readable name of the site the notification concerns.
+      example: Acme Pharma Plant 3
+    siteAddress:
+      type: string
+      minLength: 1
+      maxLength: 512
+      description: Postal address of the site the notification concerns.
+      example: 221B Baker Street, London, NW1 6XE, UK
+    affectedCustomerReferences:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      uniqueItems: true
+      description: >-
+        References of the customers to notify. Each entry is a unique,
+        non-empty customer reference.
+      items:
+        type: string
+        minLength: 1
+        maxLength: 64
+        example: CUST-004521
+      example:
+        - CUST-004521
+        - CUST-004522
+  discriminator:
+    propertyName: messageType
+    mapping:
+      REGULATORY_EVENT: '#/RegulatoryEventIngestRequest'
+      CERTIFICATE_EXPIRY: '#/CertificateExpiryIngestRequest'
+
+RegulatoryEventIngestRequest:
+  description: >-
+    Notification raised when a regulatory event (e.g. an authority alert or
+    document) is detected for a site and must be relayed to affected customers.
+  allOf:
+    - $ref: '#/IngestNotificationRequest'
+    - type: object
+      required:
+        - authorityName
+        - documentTypeCode
+        - issueDate
+        - confidenceLevel
+      properties:
+        authorityName:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Name of the regulatory authority that issued the event.
+          example: European Medicines Agency
+        documentTypeCode:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Canonical external document type code. Unknown codes are accepted.
+          example: WARNING_LETTER
+        issueDate:
+          type: string
+          format: date
+          description: >-
+            Date the regulatory document was issued by the authority, as an
+            ISO-8601 calendar date (YYYY-MM-DD).
+          example: '2026-10-07'
+        confidenceLevel:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: >-
+            Confidence that the detected regulatory event is correct, expressed
+            as a percentage (0 = no confidence, 100 = full confidence).
+          example: 91
+
+CertificateExpiryIngestRequest:
+  description: >-
+    Notification raised when a site certificate (e.g. a GMP certificate) is
+    approaching its expiry date, so affected customers can be warned ahead of
+    time.
+  allOf:
+    - $ref: '#/IngestNotificationRequest'
+    - type: object
+      required:
+        - certificateType
+        - issuingAuthority
+        - expiryDate
+      properties:
+        certificateType:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Canonical code of the certificate that is expiring.
+          example: GMP_CERTIFICATE
+        issuingAuthority:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Name of the authority that issued the certificate.
+          example: European Medicines Agency
+        expiryDate:
+          type: string
+          format: date
+          description: >-
+            Date on which the certificate expires, as an ISO-8601 calendar date
+            (YYYY-MM-DD).
+          example: '2026-12-31'
+
+ProcessNotificationResponse:
+  type: object
+  description: Acknowledgement returned when a notification has been accepted for processing.
+  required:
+    - eventReference
+    - idempotencyKey
+    - messageType
+    - status
+    - duplicate
+  properties:
+    eventReference:
+      type: string
+      description: Server-generated identifier for the accepted notification event.
+      example: 2f6a9c47-3b8e-4d2a-9c1f-8e7b5a3d2c10
+    idempotencyKey:
+      type: string
+      description: The idempotency key echoed back from the originating request.
+      example: 7f3c2b10-5d9a-4a1e-8f2b-1c9d4e6a0b11
+    messageType:
+      $ref: '#/MessageType'
+    status:
+      type: string
+      description: >-
+        Processing status of the notification. RECEIVED immediately after
+        ingestion; it then transitions through DISPATCHING to COMPLETED, or to
+        FAILED if delivery cannot be completed.
+      enum:
+        - RECEIVED
+        - DISPATCHING
+        - COMPLETED
+        - FAILED
+      example: RECEIVED
+    duplicate:
+      type: boolean
+      description: >-
+        True when this request matched an existing idempotency key and the
+        original event is being returned rather than a newly created one.
+      example: false

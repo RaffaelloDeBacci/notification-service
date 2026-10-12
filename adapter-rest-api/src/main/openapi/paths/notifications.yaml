@@ -1,0 +1,87 @@
+post:
+  tags:
+    - NotificationIngestion
+  operationId: ingestNotification
+  summary: Ingest a notification
+  requestBody:
+    required: true
+    content:
+      application/json:
+        # Polymorphic request body modelled with a discriminator on the base
+        # schema `IngestNotificationRequest`: `messageType` selects the concrete
+        # variant. Each variant composes the base via `allOf`, so the generator
+        # emits `class XIngestRequest extends IngestNotificationRequest` and the
+        # controller/request-mapper keep a single stable base parameter type.
+        #
+        # (`oneOf` + `allOf` + discriminator was evaluated for its slightly nicer
+        # Swagger variant dropdown, but once two members share a base the Spring
+        # generator mis-generates the base as an interface whose discriminator
+        # getter returns String while the variants return the MessageType enum —
+        # which won't compile. The discriminator-on-base form below avoids that.)
+        schema:
+          $ref: '../components/schemas/notifications.yaml#/IngestNotificationRequest'
+        examples:
+          regulatoryEvent:
+            summary: Regulatory event notification
+            value:
+              idempotencyKey: 7f3c2b10-5d9a-4a1e-8f2b-1c9d4e6a0b11
+              messageType: REGULATORY_EVENT
+              siteName: Acme Pharma Plant 3
+              siteAddress: 221B Baker Street, London, NW1 6XE, UK
+              authorityName: European Medicines Agency
+              documentTypeCode: WARNING_LETTER
+              issueDate: '2026-10-07'
+              confidenceLevel: 91
+              affectedCustomerReferences:
+                - CUST-004521
+                - CUST-004522
+          certificateExpiry:
+            summary: Certificate expiry notification
+            value:
+              idempotencyKey: 9a1d4c22-7e6b-4f3a-9b2c-2d8e5f7a1c33
+              messageType: CERTIFICATE_EXPIRY
+              siteName: Acme Pharma Plant 3
+              siteAddress: 221B Baker Street, London, NW1 6XE, UK
+              certificateType: GMP_CERTIFICATE
+              issuingAuthority: European Medicines Agency
+              expiryDate: '2026-12-31'
+              affectedCustomerReferences:
+                - CUST-004521
+                - CUST-004522
+  responses:
+    '202':
+      description: Notification accepted for processing
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/notifications.yaml#/ProcessNotificationResponse'
+    '400':
+      description: Invalid request payload
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'
+    '409':
+      description: Conflict with current resource state
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'
+    '422':
+      description: Semantic validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'
+    '503':
+      description: Required dependency unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/errors.yaml#/ErrorResponse'

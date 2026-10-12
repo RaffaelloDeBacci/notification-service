@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-core-tables-sql
+      author: gabriele.raffaelli
+      changes:
+        - sqlFile:
+            path: changes/001-create-core-tables.sql
+            relativeToChangelogFile: true
+  - changeSet:
+      id: 002-seed-initial-data-sql
+      author: gabriele.raffaelli
+      changes:
+        - sqlFile:
+            path: changes/002-seed-initial-data.sql
+            relativeToChangelogFile: true

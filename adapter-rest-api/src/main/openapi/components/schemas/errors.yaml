@@ -1,0 +1,38 @@
+ErrorReason:
+  type: string
+  enum:
+    - VALIDATION_FAILED
+    - CONFLICT
+    - BUSINESS_RULE_VIOLATION
+    - DEPENDENCY_UNAVAILABLE
+    - NOT_FOUND
+    - INTERNAL_ERROR
+
+ErrorResponse:
+  type: object
+  required:
+    - code
+    - reason
+    - message
+    - timestamp
+    - path
+  properties:
+    code:
+      type: string
+      description: Stable machine-readable code
+      example: NOTIF-VAL-001
+    reason:
+      $ref: '#/ErrorReason'
+    message:
+      type: string
+      example: One or more fields are invalid
+    timestamp:
+      type: string
+      format: date-time
+    path:
+      type: string
+      example: /api/v1/events
+    details:
+      type: array
+      items:
+        type: string
