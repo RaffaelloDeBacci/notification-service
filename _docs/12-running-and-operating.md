@@ -13,10 +13,15 @@
 
 ```bash
 # 1. Start the dependencies
+docker compose -f _dev/docker-compose.yml down -v
 docker compose -f _dev/docker-compose.yml up -d
-
-# 2. Build (runs all tests) and start the service on port 8080
+```
+```bash
+# 2. Build (runs all tests)
 ./mvnw verify
+```
+```bash
+# 3. Start the service
 java -jar notification-boot/target/notification-boot-0.0.1-SNAPSHOT.jar
 ```
 
@@ -39,13 +44,13 @@ flowchart LR
 ### Try it
 
 ```bash
-# 1. Give a customer a distribution list
+# 4. Give a customer a distribution list
 curl -X PUT localhost:8080/api/v1/customers/CUST-1/distribution-list \
   -H 'Content-Type: application/json' -H 'X-Actor: you@qualifyze.com' \
   -d '{"targets":[{"deliveryChannel":"EMAIL","notificationTarget":"qa@customer.example"}]}'
 ```
 ```bash
-# 2. Send a notification
+# 5. Send a notification
 curl -X POST localhost:8080/api/v1/notifications \
   -H 'Content-Type: application/json' \
   -d '{"idempotencyKey":"try-1","messageType":"REGULATORY_EVENT",
@@ -55,11 +60,11 @@ curl -X POST localhost:8080/api/v1/notifications \
        "affectedCustomerReferences":["CUST-1"]}'
 ```
 ```bash
-# 3. Open email client to see the e-mail
+# 6. Open email client to see the e-mail
 open "http://localhost:8025"
 ```
 ```bash
-# 4. Read the audit events that reached "AWS"
+# 7. Read the audit events that reached "AWS"
 aws --endpoint-url http://localhost:4566 sqs receive-message \
   --queue-url http://localhost:4566/000000000000/notification-audit-events \
   --max-number-of-messages 10

@@ -5,7 +5,7 @@
 - Two endpoints: one to **send a notification**, one to **set a customer's
   distribution list**.
 - The contract is written first in OpenAPI
-  ([notification-api.yaml](../../adapter-rest-api/src/main/openapi/notification-api.yaml));
+  ([notification-api.yaml](../adapter-rest-api/src/main/openapi/notification-api.yaml));
   the Java code is generated from it, so the two never disagree.
 - The API is for internal services only. The service mesh checks who is calling
   before the request reaches us.

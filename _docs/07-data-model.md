@@ -13,13 +13,43 @@ Four tables in PostgreSQL:
 
 The schema is created and changed only by **Liquibase** scripts.
 
-## Diagram
+## 1. Conceptual model
+
+Business concepts and how they relate (no SQL details):
+
+```mermaid
+flowchart LR
+    N[Notification] -->|is sent to| C[Customer]
+    C -->|has current| T[Distribution targets]
+    N -->|produces many| A[Dispatch attempts]
+    N -->|emits| E[Audit events]
+    T -->|changes emit| E
+    A -->|recorded as| E
+```
+
+- A **notification** is the unit of work accepted by the API.
+- A customer's **distribution targets** are the current destinations (e-mail, Slack, ...).
+- Sending a notification produces one or more **dispatch attempts**.
+- Important state changes produce **audit events** and are relayed asynchronously.
+
+## 2. Logical model
+
+Entity-level rules independent of PostgreSQL data types:
+
+| Entity | Identifier | Core relationships | Invariants |
+|---|---|---|---|
+| Notification | `event_reference` | 1 notification -> 0..n dispatch attempts; 1 notification -> 0..n audit events | `idempotency_key` is unique; terminal states are `COMPLETED`/`FAILED` |
+| Dispatch attempt | notification + customer + channel + target + attempt number | n attempts -> 1 notification (by `idempotency_key`) | Append-only; outcome is `DELIVERED` or `FAILED` |
+| Distribution target | customer + channel + target | n targets -> 1 customer | No duplicate target per customer and channel |
+| Audit event | `event_id` (`sequence` for ordering) | n events -> 1 aggregate (`Notification`, `DispatchAttempt`, `DistributionList`) | Append-only; relay marks forwarded rows with `published_at` |
+
+## 3. Physical model (PostgreSQL ERD)
 
 ```mermaid
 erDiagram
     NOTIFICATION_INBOX ||..o{ DISPATCH_LEDGER : "idempotency_key"
-    NOTIFICATION_INBOX ||..o{ AUDIT_OUTBOX : "status changes"
-    DISTRIBUTION_LIST ||..o{ AUDIT_OUTBOX : "list changes"
+    NOTIFICATION_INBOX ||..o{ AUDIT_OUTBOX : "aggregate_id when aggregate_type=Notification"
+    DISTRIBUTION_LIST ||..o{ AUDIT_OUTBOX : "aggregate_id=customer_reference when aggregate_type=DistributionList"
 
     NOTIFICATION_INBOX {
         varchar event_reference PK "our ID"
@@ -52,6 +82,7 @@ erDiagram
         varchar delivery_channel
         varchar notification_target
         timestamptz created_at
+        timestamptz updated_at
     }
 
     AUDIT_OUTBOX {
@@ -63,15 +94,22 @@ erDiagram
         varchar actor
         timestamptz occurred_at
         jsonb payload
+        timestamptz created_at
         timestamptz published_at "null until forwarded"
     }
 ```
 
-The dotted lines are links by value, **not** foreign keys. The ledger and the
-audit events must survive even if a notification is cleaned up one day, and the
-outbox receives events from several tables.
+The dotted lines are links by value, **not** foreign keys.
 
-## The tables
+- The ledger and outbox are append-heavy and must survive independently.
+- `audit_outbox.aggregate_id` is polymorphic: it points to different business
+  identifiers depending on `aggregate_type`.
+- For `DispatchAttempt` events, `aggregate_id` stores the notification
+  `idempotency_key`, not `dispatch_ledger.id`.
+- Surrogate keys (`dispatch_ledger.id`, `distribution_list.id`) exist only for
+  the database; the business keys are listed in the [logical model](#2-logical-model).
+
+## 4. The tables
 
 ### notification_inbox
 
@@ -112,27 +150,39 @@ A **waiting room** for audit events, not their permanent home.
 
 - Written in the **same transaction** as the change it describes.
 - `sequence` always increases, so the audit service can detect gaps.
-- Forwarded rows get `published_at` and are deleted after 7 days.
+- Forwarded rows get `published_at`. An hourly purge job deletes them 7 days
+  later (`notification.audit.outbox.retention`, default `P7D`).
 - Two small indexes: one for "not yet forwarded" (what the relay reads) and one
   for "forwarded" (what the clean-up reads).
 
-## Notification lifecycle (canonical source)
+## 5. Which process touches which table
 
-State transitions, claim rules, and crash recovery are defined in
-[How it works](05-how-it-works.md#the-life-of-a-notification).
+Whenever a step writes an audit event, it does so in the same transaction as the
+change it describes, so neither can exist without the other.
 
-This page focuses on the storage model that supports that lifecycle.
+| Process step | Reads | Writes (audit event in `audit_outbox`) |
+|---|---|---|
+| Receive a notification | `notification_inbox` (by `idempotency_key`) | Inserts `notification_inbox` as `RECEIVED` (`notification.received`); a repeated key writes nothing |
+| Claim for sending | `notification_inbox` | Sets `DISPATCHING`, `claimed_at`, `claim_count + 1` (no audit event); rows claimed too often become `FAILED` (`notification.status-changed`) |
+| Send to one target | `distribution_list`, `dispatch_ledger` (already delivered?) | Inserts `dispatch_ledger` (`notification.delivery.attempt-recorded`); then renews `claimed_at` in a separate transaction |
+| Finish a notification | — | Sets `notification_inbox` to `COMPLETED` or `FAILED` (`notification.status-changed`) |
+| Replace a distribution list | `distribution_list` | Deletes removed / inserts added targets (`notification.distribution-list.target-removed` / `-added`) |
+| Forward audit events | `audit_outbox` (unpublished, by `sequence`) | Sets `published_at` |
+| Purge forwarded events | — | Deletes `audit_outbox` rows forwarded more than 7 days ago |
 
-## Database changes (Liquibase)
+State transitions, retries, and crash recovery are described in
+[How it works](05-how-it-works.md#the-life-of-a-notification); this page only
+covers the storage that supports them.
+
+## 6. Database changes (Liquibase)
 
 Scripts live in
-`adapter-persistence-postgres/src/main/resources/db/changelog/changes/`:
+`../adapter-persistence-postgres/src/main/resources/db/changelog/changes`:
 
 | Script | What it does |
 |---|---|
 | `001-create-core-tables.sql` | Creates the four tables and their indexes |
 | `002-seed-initial-data.sql` | Adds one demo distribution list (`demo-customer`) |
-| `003-align-column-lengths.sql` | Matches column sizes to the API limits, adds the crash-recovery columns and the "delivered" index, removes unused columns |
 
 Rules:
 

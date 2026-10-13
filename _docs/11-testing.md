@@ -67,7 +67,7 @@ Tests need nothing installed except **Docker**.
 Coverage is merged from unit and integration tests of **all modules** into one
 JaCoCo report:
 
-- Report: `notification-boot/target/site/jacoco-aggregate/index.html`
+- Report: `../notification-boot/target/site/jacoco-aggregate/index.html`
 - Rule: **line coverage ≥ 90 %**, checked during `./mvnw verify`. Below that the
   build fails.
 - Excluded: code generated from the OpenAPI file (we do not write it, so testing
