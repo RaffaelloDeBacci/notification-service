@@ -22,7 +22,7 @@ The service mesh checks the calling service before the request reaches us
 
 | Header | Endpoint | Set by | Meaning |
 |---|---|---|---|
-| `X-Actor` (optional, max 128) | Distribution list | The BFF | The **logged-in user** behind the change, e.g. `jane.doe@qualifyze.com` |
+| `X-Actor` (optional ⚠️, max 128) | Distribution list | The [BFF](01-overview.md#key-words) | The **logged-in user** behind the change, e.g. `jane.doe@qualifyze.com` |
 
 `X-Actor` is stored as the actor of every distribution-list audit event. If it
 is missing, the actor is `notification-service`. Notification ingestion has no
@@ -110,8 +110,12 @@ flowchart LR
     Q -- yes --> O[Return the original<br/>duplicate = true<br/>nothing is sent]
 ```
 
-We do not compare the content of the two requests. A new notification must use a
-new key.
+- The check and the insert are one database statement, so two identical
+  requests arriving at the same moment still create one notification.
+- We do not compare the content of the two requests. A new notification must
+  use a new key ([Assumption A8](03-assumptions.md#a8-a-new-notification-always-gets-a-new-idempotency-key),
+  [Decision D9](13-design-decisions.md#d9-idempotency-key-without-a-content-check)).
+- Retrying with the **same** key is always safe, including after a `503`.
 
 ## Set a distribution list
 
@@ -131,7 +135,7 @@ Replaces the customer's whole list. Sending the same list twice changes nothing.
 | Field | Rules |
 |---|---|
 | `customerReference` (in the path) | 1–64 characters |
-| `targets` | at least 1 |
+| `targets` | 1–50 |
 | `deliveryChannel` | `EMAIL` or `SLACK` |
 | `notificationTarget` | 1–320 characters. For `EMAIL`, a valid e-mail address. |
 
@@ -184,10 +188,12 @@ Every error has the same shape:
   `duplicate = true`.
 - Retrying with the **same** idempotency key is always safe.
 
-## Design rationale (canonical source)
-
-API design choices are explained in [Design decisions](13-design-decisions.md):
+## Why it is designed this way
 
 - [D2. Accept now, send later](13-design-decisions.md#d2-accept-now-send-later)
 - [D9. Idempotency key without a content check](13-design-decisions.md#d9-idempotency-key-without-a-content-check)
 - [D10. Contract-first API](13-design-decisions.md#d10-contract-first-api)
+
+---
+
+← [5. How it works](05-how-it-works.md) · [Docs index](README.md) · [7. Data model](07-data-model.md) →

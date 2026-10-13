@@ -36,8 +36,9 @@ sequenceDiagram
     end
 ```
 
-- The **idempotency key** makes repeats harmless. If the caller times out and
-  sends again, the second request returns the first result.
+- The [idempotency key](01-overview.md#key-words) makes repeats harmless. If
+  the caller times out and sends again, the second request returns the first
+  result ([details](06-api.md#sending-the-same-request-twice)).
 - The check and the insert are **one database statement**
   (`INSERT … ON CONFLICT DO NOTHING`), so two identical requests arriving at the
   same moment still create only one notification.
@@ -91,7 +92,7 @@ Step by step:
 3. **Find the targets.** For each affected customer, read their distribution
    list. A customer **without a list** is skipped, with a warning and a metric.
    We never make up an address.
-4. **Skip what is done.** If the dispatch ledger says this target already
+4. **Skip what is done.** If the [dispatch ledger](01-overview.md#key-words) says this target already
    received this notification (for example before a crash), skip it.
 5. **Send, retrying short failures.** See [retries](#retries) below.
 6. **Record.** Every attempt, successful or not, is saved in the dispatch ledger
@@ -126,7 +127,8 @@ flowchart LR
 ## 3. Recovering from a crash
 
 What if the service stops while sending? The notification is stuck in
-`DISPATCHING`. To handle that, a claim is a **lease**: it only lasts 5 minutes.
+`DISPATCHING`. To handle that, a claim is a [lease](01-overview.md#key-words):
+it only lasts 5 minutes.
 
 ```mermaid
 sequenceDiagram
@@ -197,16 +199,9 @@ sequenceDiagram
     Note over Relay,OB: Forwarded events are deleted after 7 days
 ```
 
-Why not send to SNS directly during the change? Because if SNS were down, we would
-have to choose between losing the audit event or failing the business change.
-Writing the event to an **outbox table** in the same transaction as the change
-means it can never be lost. The relay forwards it as soon as SNS is reachable.
-This is the *transactional outbox* pattern. After SNS, the audit service's
-SQS queue holds the events until the audit service has stored them, so an
-audit-service outage does not lose anything either.
-
-Each event has a number that always increases (`sequence`), so the audit service
-can spot a missing event.
+The full journey (SNS → SQS → audit service → S3), and why it can be trusted, is
+described in
+[Audit & compliance](08-audit-and-compliance.md#the-journey-of-an-audit-record).
 
 ## The life of a notification
 
@@ -225,3 +220,7 @@ stateDiagram-v2
 automatically. The ledger shows exactly which targets failed and why. To send it
 again, the caller submits it with a **new** idempotency key; this is a new
 notification and goes to every target again.
+
+---
+
+← [4. Architecture](04-architecture.md) · [Docs index](README.md) · [6. API](06-api.md) →

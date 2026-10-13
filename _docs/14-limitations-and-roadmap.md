@@ -17,17 +17,14 @@ build next.
 | Audit events could be edited in our database for about a second before forwarding | Only by a database administrator | Very unlikely; a hash chain would close it (see roadmap). |
 | Any allowed internal service can change any customer's list | Wider access than strictly needed | Normal for internal APIs; per-action permissions are on the roadmap. |
 | Messages are only in English | Non-English customers get English | The texts are already in a translation file; adding a language is configuration. |
-| The demo seed data runs in every environment | One demo list in production | Must be limited to a `local` Liquibase context before production. |
-| Local setup uses dummy AWS keys | None locally; a risk if left in production | Production uses IAM roles; listed in the production checklist. |
 
-Detailed code-level security gaps live in one place:
-[Security threat assessment → Mitigation check](09-security-threat-assessment.md#mitigation-check).
 
 ## Roadmap
 
 ```mermaid
 flowchart LR
     subgraph Next[Next]
+        Z[Close security gaps G1–G4]
         A[Slack sender]
         B[Per-customer language]
         C[Alerts and dashboard]
@@ -36,6 +33,7 @@ flowchart LR
         D[Shared audit library]
         E[Hash-chained audit events]
         F[Per-action permissions]
+        J[Record the calling service]
     end
     subgraph Later[Later]
         G[Texts loaded from S3]
@@ -49,7 +47,7 @@ flowchart LR
 |---|---|---|
 | **Slack sender** | A new `adapter-slack` module implementing `NotificationSenderPort` | First new channel (FR.1.7). |
 | **Per-customer language** | A `locale` on each distribution list, used by the renderer | Customers in other countries. |
-| **Alerts and dashboard** | The alerts and panels from [Metrics](10-metrics.md) | Notice failures within minutes. |
+| **Alerts and dashboard** | Set up the 📋 proposed alerts and panels from [Metrics](10-metrics.md#alerts) | Notice failures within minutes. |
 | **Shared audit library** | Move the outbox and relay into a Spring Boot starter used by every service; compare with Debezium and Spring Modulith | Same audit pipeline everywhere. |
 | **Hash-chained audit events** | Each event includes a fingerprint of the previous one | Detects any edit before forwarding. |
 | **Per-action permissions** | Allow only some services to change distribution lists | Least privilege. |
@@ -57,3 +55,7 @@ flowchart LR
 | **Texts loaded from S3** | Language packs updated without a release, with the built-in texts as backup | Faster wording changes. |
 | **Status endpoint** | `GET /api/v1/notifications/{eventReference}` with per-target results | Callers can check delivery themselves. |
 | **Standard error format** | Move to RFC 9457 `ProblemDetail` | Common format across services. |
+
+---
+
+← [13. Design decisions](13-design-decisions.md) · [Docs index](README.md)

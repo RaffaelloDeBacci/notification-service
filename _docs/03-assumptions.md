@@ -21,16 +21,11 @@ be wrong.
 - **Why:** every Qualifyze service has the same ISO 27001 / SOC 2 duty to keep
   history. One shared, tamper-proof archive is safer and cheaper than each
   service building its own.
-- **What it means:** this service sends every change as an *audit event* to a
-  message topic (AWS SNS). The topic delivers each event to an **SQS queue**
-  owned by the central audit service. The audit service reads the queue and
-  stores the events in S3 with Object Lock, where they cannot be changed or
-  deleted. The path is **SNS → SQS → audit service → S3**. This service only
-  guarantees that **no event is lost before it reaches SNS**; the queue
-  keeps events safe while the audit service is busy or down.
-- **Order:** to keep events in order end to end, the topic and the queue are
-  both FIFO (`.fifo`). The service already sets the message group and a
-  deduplication ID (the event ID) when the topic name ends in `.fifo`.
+- **What it means:** this service sends every change as an *audit event* to an
+  AWS SNS topic. From there the central audit service stores it in an archive
+  that nobody can change or delete. This service only guarantees that **no
+  event is lost before it reaches SNS**. The full path is described in
+  [Audit & compliance](08-audit-and-compliance.md#the-journey-of-an-audit-record).
 - **If wrong:** if no central archive exists, we add a consumer that writes the
   events to S3; the service itself does not change.
 
@@ -54,14 +49,15 @@ be wrong.
 ### A5. Only internal services call the API
 
 - **Why:** the caller is an existing internal process.
-- **What it means:** the service runs inside a *service mesh* that encrypts
-  traffic and checks the identity of the calling service (mutual TLS).
+- **What it means:** the service runs inside a
+  [service mesh](01-overview.md#key-words) that encrypts traffic and checks the
+  identity of the calling service (mutual TLS).
 - **Notification ingestion:** only the internal detection process calls
   `POST /api/v1/notifications`. Being reachable only inside the mesh is enough;
   the service does no authentication or authorisation of its own.
 - **Distribution lists:** people never call
   `PUT /api/v1/customers/{customerReference}/distribution-list` directly. A
-  **BFF** (backend for frontend) in front of this service logs users in and
+  [BFF](01-overview.md#key-words) in front of this service logs users in and
   checks that they may edit that customer's list, then passes the logged-in
   user in the `X-Actor` header. We record it as the actor of each change. This
   service only trusts the BFF, through the mesh.
@@ -74,9 +70,10 @@ be wrong.
 - **Why:** a mail server can accept a message and the service can crash before
   writing down that it was sent. No system can fully avoid this without the mail
   server's help.
-- **What it means:** we remember every successful delivery and never resend it.
-  Only that one crash window can cause a duplicate. We prefer one rare duplicate
-  to a missed warning.
+- **What it means:** we remember every successful delivery in the
+  [dispatch ledger](01-overview.md#key-words) and never resend it. Only that one
+  crash window can cause a duplicate. We prefer one rare duplicate to a missed
+  warning.
 
 ### A7. A customer without a distribution list is skipped, not an error
 
@@ -90,7 +87,8 @@ be wrong.
 - **Why:** the key is how we recognise a repeated request.
 - **What it means:** if the same key arrives twice, we return the first result
   and do not send again. We do not compare the content; reusing a key for a
-  different event is a caller mistake.
+  different event is a caller mistake. See
+  [API → Sending the same request twice](06-api.md#sending-the-same-request-twice).
 
 ### A9. The audit "outbox" will become a shared library
 
@@ -126,3 +124,7 @@ be wrong.
 | S5 | Audit history must be kept for 7 years; the central archive enforces this. |
 | S6 | A notification is **completed** when every reachable target received it; if any target failed for good, it is **failed** so someone can look at it. |
 | S7 | Customer references are short IDs (at most 64 characters) and one notification affects at most 50 customers (the brief says 10–25). |
+
+---
+
+← [2. Requirements & acceptance](02-requirements-and-acceptance.md) · [Docs index](README.md) · [4. Architecture](04-architecture.md) →

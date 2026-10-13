@@ -92,3 +92,7 @@ The same `./mvnw verify` runs on every push in GitHub Actions (Java 25).
 2. Database changes come with an integration test on real PostgreSQL.
 3. API changes come with a contract test for the success and the error cases.
 4. Assert on **exact** outcomes, not only on "no exception".
+
+---
+
+← [10. Metrics](10-metrics.md) · [Docs index](README.md) · [12. Running and operating](12-running-and-operating.md) →

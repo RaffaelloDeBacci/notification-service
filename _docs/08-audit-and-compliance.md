@@ -9,7 +9,7 @@
 - They are forwarded through **SNS and SQS** to a **central archive that nobody
   can edit or delete** (S3 with Object Lock), owned by a separate audit service.
 - Day-to-day questions ("was this customer told?") are answered from the
-  **dispatch ledger** in our own database.
+  [dispatch ledger](01-overview.md#key-words) in our own database.
 
 ## What is recorded
 
@@ -83,7 +83,7 @@ flowchart LR
 | SNS is down | Events wait in the outbox and are sent later. Nothing is lost. A metric shows the backlog. |
 | The audit service is down | Events wait in its SQS queue (kept up to 14 days) and are stored once it is back. Events it cannot process go to a dead-letter queue instead of being dropped. |
 | An event goes missing on the way | Sequence numbers always increase, so the audit service can spot a gap. |
-| Events arrive out of order | The SNS topic and the SQS queue are FIFO, so the order is kept end to end. |
+| Events arrive out of order | The SNS topic and the SQS queue are FIFO (`.fifo`), so the order is kept end to end. When the topic name ends in `.fifo`, the service sets the message group and uses the event ID as deduplication ID. |
 | The same event arrives twice | Each has a unique event ID, so duplicates are ignored. |
 | Someone edits the history | The archive is write-once. This service can only *publish* to SNS; it has no access to the queue or the archive. |
 | A record is edited in our database before it is forwarded | Possible only for a database administrator, in a window of about a second. A *hash chain* (each event includes a fingerprint of the previous one) would close this gap; it is on the [roadmap](14-limitations-and-roadmap.md). |
@@ -118,3 +118,7 @@ our database stays simple, and compliance does not depend on it.
 | "Who added this address to customer X's list, and when?" | `target-added` events in the archive |
 | "Show everything that happened to notification N" | All archive events for that event reference, ordered by sequence |
 | "Is the history complete?" | Check the sequence numbers have no gaps |
+
+---
+
+← [7. Data model](07-data-model.md) · [Docs index](README.md) · [9. Security threats](09-security-threat-assessment.md) →

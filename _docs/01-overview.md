@@ -88,6 +88,7 @@ be **correct, traceable and easy to extend**.
 | Word | Meaning |
 |---|---|
 | **Notification** | One request from the caller, e.g. one warning letter for one site. |
+| **Event reference** | Our ID for a notification, returned by the API. |
 | **Distribution list** | The addresses a customer wants notifications sent to. |
 | **Target** | One address on a distribution list (an e-mail address or, later, a Slack channel). |
 | **Channel** | How a message is delivered: e-mail today, Slack or WhatsApp in the future. |
@@ -96,3 +97,11 @@ be **correct, traceable and easy to extend**.
 | **Dispatch ledger** | The list of every delivery attempt: who, when, which channel, success or failure. |
 | **Audit event** | A record of a change, sent to the central audit archive. |
 | **Outbox** | A table where audit events wait until they are forwarded to the archive. |
+| **Lease** | A time-limited claim on a notification while it is being sent. If the service crashes, the lease expires and another run picks the notification up again. |
+| **Actor** | Who made a change, recorded in every audit event. For list changes, the logged-in user passed in the `X-Actor` header. |
+| **Service mesh** | The network layer between our pods. It encrypts traffic (mutual TLS) and checks which service is calling. |
+| **BFF** | *Backend for frontend*: the internal service that logs users in and calls this service on their behalf. |
+
+---
+
+← [0. Brief](00-brief.md) · [Docs index](README.md) · [2. Requirements & acceptance](02-requirements-and-acceptance.md) →

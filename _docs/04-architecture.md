@@ -87,7 +87,10 @@ flowchart LR
 Everything except the mail server is in AWS (see
 [Assumption A10](03-assumptions.md#a10-everything-runs-in-aws)). The SQS
 queue, the audit service and the S3 archive belong to the audit team; this
-service can only publish to its SNS topic.
+service can only publish to its SNS topic. How audit events travel is described
+in [Audit & compliance](08-audit-and-compliance.md#the-journey-of-an-audit-record);
+the security view of this picture is in the
+[threat assessment](09-security-threat-assessment.md#trust-boundaries).
 
 ## Modules
 
@@ -219,3 +222,7 @@ No database change is needed: the notification's content is stored as JSON.
   `NotificationInboxPort`.
 - Every change to data and its audit event are saved in **the same database
   transaction**: either both happen or neither does.
+
+---
+
+← [3. Assumptions](03-assumptions.md) · [Docs index](README.md) · [5. How it works](05-how-it-works.md) →

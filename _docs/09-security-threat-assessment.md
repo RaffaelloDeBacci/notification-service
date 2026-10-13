@@ -2,7 +2,8 @@
 
 ## In short
 
-- The service is **internal** and runs entirely in **AWS** (see
+- The service is **internal** and runs entirely in **AWS** behind a
+  [service mesh](01-overview.md#key-words) (see
   [Assumption A10](03-assumptions.md#a10-everything-runs-in-aws)): pods in
   Amazon EKS behind a service mesh, Aurora PostgreSQL, and SNS → SQS → audit
   service → S3 for the audit trail. Only the **mail server** is outside AWS.
@@ -14,6 +15,16 @@
 - Each risk below has a likelihood, an impact, how we reduce it, and what risk
   remains. [Mitigation check](#mitigation-check) shows which controls are in
   the code today, which must be set up in AWS, and which are still missing.
+- **No threat is rated high.** Four code gaps remain, listed once in
+  [Open gaps](#open-gaps).
+
+**On this page:** [What we protect](#what-we-protect) ·
+[Trust boundaries](#trust-boundaries) · [Threats](#threats) ·
+[Mitigation check](#mitigation-check) · [Open gaps](#open-gaps) ·
+[Summary](#summary)
+
+Status markers: ✅ in code · ☁️ set up in AWS / mesh · ⚠️ gap
+([legend](README.md#status-markers)).
 
 ## What we protect
 
@@ -115,9 +126,8 @@ We use **STRIDE**, a standard checklist: **S**poofing, **T**ampering,
 - **Prevented by:** only the BFF can reach the distribution-list endpoint
   (per-path mesh rule, T1), and the BFF sets `X-Actor` from the user it has
   logged in.
-- **Gap:** `X-Actor` is optional. A change without it is recorded as
-  `notification-service`, so it cannot be traced to a person. The header should
-  be required on this endpoint.
+- **Gap ⚠️ [G2](#open-gaps):** `X-Actor` is optional. A change without it is
+  recorded as `notification-service`, so it cannot be traced to a person.
 - **Remaining risk:** the person's name is only as trustworthy as the BFF. It
   is attribution, not proof of identity. Storing the mesh identity of the
   calling service next to it is on the roadmap.
@@ -130,11 +140,10 @@ We use **STRIDE**, a standard checklist: **S**poofing, **T**ampering,
   distribution list has at most 50 targets. E-mail addresses are checked for
   valid syntax. The database is only called with parameters, never with
   string-built SQL. Messages are sent as plain text, never HTML.
-- **Gap:** the API contract allows up to **1,000** customers per notification,
-  not the 50 stated in [the API](06-api.md) and
-  [FR.1.5](02-requirements-and-acceptance.md). With 50 targets each, one
-  request could send up to 50,000 e-mails. `maxItems` in the OpenAPI contract
-  should be 50.
+- **Gap ⚠️ [G1](#open-gaps):** the API contract allows up to **1,000**
+  customers per notification, not the 50 we assume
+  ([S7](03-assumptions.md#smaller-assumptions)). With 50 targets each, one
+  request could send up to 50,000 e-mails.
 - **Remaining risk:** low once the limit is fixed.
 
 ### T4. Warning sent to the wrong person
@@ -224,9 +233,8 @@ not protected by AWS networking.
 
 - **Prevented by:** SMTP login and STARTTLS (turned on by configuration in
   production).
-- **Gap:** STARTTLS is *opportunistic*: if the server or a man in the middle
-  does not offer it, the mail is sent unencrypted. The service should set
-  `mail.smtp.starttls.required=true` (not configurable today).
+- **Gap ⚠️ [G3](#open-gaps):** STARTTLS is *opportunistic*: if the server or a
+  man in the middle does not offer it, the mail is sent unencrypted.
 - **Remaining risk:** after the mail server, delivery to the customer's mail
   provider is outside our control.
 
@@ -243,34 +251,34 @@ not protected by AWS networking.
 ## Mitigation check
 
 We checked every control against the code and the configuration in this
-repository. Controls marked **AWS / mesh** live outside the code and must be
-confirmed in each environment.
+repository. Controls marked ☁️ live outside the code and must be confirmed in
+each environment.
 
 | Control | Threats | Where | Status |
 |---|---|---|---|
-| Length limits on every field; 50 targets per list | T3 | OpenAPI contract, domain | In code |
-| At most 50 customers per notification | T3 | OpenAPI contract | **Gap:** contract says 1,000 |
-| E-mail syntax check | T3, T4 | `DistributionListTarget` | In code |
-| Parameterised SQL only | T3 | Repositories | In code |
-| Plain-text e-mail | T3 | SMTP adapter (`SimpleMailMessage`) | In code |
-| Recipients only from stored lists; skip if none | T4 | Dispatch use case | In code |
-| Generic `500`/`503` messages | T6 | `ApiExceptionHandler` | In code |
-| No personal data in metrics | T6 | `NotificationMetrics` | In code |
-| Error details cut to 1,000 characters | T6 | `TargetDispatcher` | In code |
-| 3 tries, backoff, no retry on permanent errors, 10 s mail timeout, 5 claims max | T7 | Dispatcher, SMTP config | In code |
-| Unique idempotency key | T9 | Database unique index | In code |
-| Audit event in the same transaction; increasing sequence | T5 | Persistence adapters | In code |
-| FIFO message group and deduplication ID | T5 | SNS adapter (when the topic ends in `.fifo`) | In code; topic must be FIFO |
-| Default AWS credentials when no keys are set | T8 | `AwsAuditBrokerConfiguration` | In code |
-| `X-Actor` required for list changes | T2 | API contract | **Gap:** optional, falls back to `notification-service` |
-| STARTTLS required | T10 | SMTP config | **Gap:** only opportunistic |
-| Demo seed data only in local | — | Liquibase | **Gap:** runs everywhere (see [Limitations](14-limitations-and-roadmap.md)) |
-| Strict mTLS, per-path allow list, `SANITIZE_SET`, NetworkPolicies | T1, T2 | Mesh, EKS | AWS / mesh |
-| IRSA role limited to `sns:Publish`; IMDSv2 hop limit 1 | T8, T11 | IAM, EKS | AWS / mesh |
-| Secrets from Secrets Manager | T8 | Deployment | AWS / mesh |
-| Aurora: KMS, private, security group, TLS `verify-full`, own user, snapshot access | T6, T8 | Aurora, JDBC URL | AWS / mesh |
-| SNS/SQS: FIFO, KMS, VPC endpoints, topic and queue policies, DLQ, 14-day retention | T5, T6, T11 | SNS, SQS | AWS / mesh (audit team for SQS) |
-| S3 Object Lock in compliance mode, separate account | T5 | S3 | AWS / mesh (audit team) |
+| Length limits on every field; 50 targets per list | T3 | OpenAPI contract, domain | ✅ In code |
+| At most 50 customers per notification | T3 | OpenAPI contract | ⚠️ [G1](#open-gaps): contract says 1,000 |
+| E-mail syntax check | T3, T4 | `DistributionListTarget` | ✅ In code |
+| Parameterised SQL only | T3 | Repositories | ✅ In code |
+| Plain-text e-mail | T3 | SMTP adapter (`SimpleMailMessage`) | ✅ In code |
+| Recipients only from stored lists; skip if none | T4 | Dispatch use case | ✅ In code |
+| Generic `500`/`503` messages | T6 | `ApiExceptionHandler` | ✅ In code |
+| No personal data in metrics | T6 | `NotificationMetrics` | ✅ In code |
+| Error details cut to 1,000 characters | T6 | `TargetDispatcher` | ✅ In code |
+| 3 tries, backoff, no retry on permanent errors, 10 s mail timeout, 5 claims max | T7 | Dispatcher, SMTP config | ✅ In code |
+| Unique idempotency key | T9 | Database unique index | ✅ In code |
+| Audit event in the same transaction; increasing sequence | T5 | Persistence adapters | ✅ In code |
+| FIFO message group and deduplication ID | T5 | SNS adapter (when the topic ends in `.fifo`) | ✅ In code · ☁️ topic must be FIFO |
+| Default AWS credentials when no keys are set | T8 | `AwsAuditBrokerConfiguration` | ✅ In code |
+| `X-Actor` required for list changes | T2 | API contract | ⚠️ [G2](#open-gaps): optional, falls back to `notification-service` |
+| STARTTLS required | T10 | SMTP config | ⚠️ [G3](#open-gaps): only opportunistic |
+| Demo seed data only in local | — | Liquibase | ⚠️ [G4](#open-gaps): runs everywhere |
+| Strict mTLS, per-path allow list, `SANITIZE_SET`, NetworkPolicies | T1, T2 | Mesh, EKS | ☁️ AWS / mesh |
+| IRSA role limited to `sns:Publish`; IMDSv2 hop limit 1 | T8, T11 | IAM, EKS | ☁️ AWS / mesh |
+| Secrets from Secrets Manager | T8 | Deployment | ☁️ AWS / mesh |
+| Aurora: KMS, private, security group, TLS `verify-full`, own user, snapshot access | T6, T8 | Aurora, JDBC URL | ☁️ AWS / mesh |
+| SNS/SQS: FIFO, KMS, VPC endpoints, topic and queue policies, DLQ, 14-day retention | T5, T6, T11 | SNS, SQS | ☁️ AWS / mesh (audit team for SQS) |
+| S3 Object Lock in compliance mode, separate account | T5 | S3 | ☁️ AWS / mesh (audit team) |
 
 ## Summary
 
@@ -280,11 +288,7 @@ confirmed in each environment.
 | Medium | T1, T2, T3, T4, T5, T6, T8, T10, T11 (all reduced by the controls above) |
 | Low | T7, T9 |
 
-**Before production:**
 
-1. Close the code gaps: limit customers per notification to 50, require
-   `X-Actor`, require STARTTLS, and run the demo seed data only locally.
-2. Confirm the **AWS / mesh** controls above in each environment. The
-   [production checklist](12-running-and-operating.md#production-checklist)
-   lists them.
-3. Set up the alerts in [Metrics](10-metrics.md).
+---
+
+← [8. Audit & compliance](08-audit-and-compliance.md) · [Docs index](README.md) · [10. Metrics](10-metrics.md) →

@@ -190,5 +190,10 @@ Rules:
 - Column sizes follow the API contract, so a request the API accepts can always
   be stored.
 - New message types need no script, because their content is JSON.
-- The demo data is for local use and tests. In production it would be limited to
-  a `local` Liquibase context.
+- The demo data is for local use and tests. ⚠️ Today it runs in every
+  environment; it must be limited to a `local` Liquibase context
+  ([gap G4](09-security-threat-assessment.md#open-gaps)).
+
+---
+
+← [6. API](06-api.md) · [Docs index](README.md) · [8. Audit & compliance](08-audit-and-compliance.md) →

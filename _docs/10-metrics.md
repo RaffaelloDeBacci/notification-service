@@ -5,6 +5,8 @@
 - **Adoption metrics** answer: *is the feature used, and does it reach the
   people it should?*
 - **Performance metrics** answer: *are messages delivered, quickly and reliably?*
+- Every metric below is ✅ published by the service today. The alerts and
+  dashboard are 📋 proposed.
 - Live numbers come from **Micrometer** (exposed through Spring Boot Actuator and
   ready for Prometheus, Datadog or CloudWatch). Weekly business numbers come from
   simple **SQL** on our own tables.
@@ -40,7 +42,7 @@ None of them contain personal data (no addresses, no customer IDs).
 | Question | Metric | How to read it |
 |---|---|---|
 | How many events do we send out? | Events per week | `increase(notification_events_processed_total[7d])`. Expected 1–5. |
-| How many customers do we reach? | Customers notified per week | `increase(notification_customers_notified_total[7d])`. Expected 10–125. |
+| How many customers do we reach? | Customers notified per week | `increase(notification_customers_notified_total[7d])`. Expected 10–125 (1–5 events × 10–25 customers). |
 | Are customers set up? | **Reach rate** = notified ÷ (notified + skipped) | Target ≥ 95 %. Low means customers have no distribution list. |
 | How many customers have a list? | Customers with a list | SQL: `SELECT count(DISTINCT customer_reference) FROM distribution_list;` |
 | Do customers maintain their lists? | List changes per month | Count of `target-added` / `target-removed` audit events |
@@ -71,10 +73,13 @@ sum(increase(notification_dispatch_attempts_total{result="success"}[7d]))
 /
 sum(increase(notification_dispatch_attempts_total{retry="false"}[7d]))
 
-# p95 send time (needs the latency histogram turned on, see Running & operating)
+# p95 send time (needs the latency histogram turned on, see Running and operating → Metrics)
 histogram_quantile(0.95,
   sum by (le) (rate(notification_dispatch_latency_seconds_bucket[1h])))
 ```
+
+The p95 query needs the latency histogram, which is off by default; see
+[Running and operating → Metrics](12-running-and-operating.md#metrics).
 
 Time to notify (SQL, last 30 days):
 
@@ -85,6 +90,11 @@ WHERE  status = 'COMPLETED' AND created_at > now() - interval '30 days';
 ```
 
 ## Alerts
+
+📋 **Proposed.** The service publishes every metric these alerts need, but the
+alert rules are not set up yet; they are on the
+[roadmap](14-limitations-and-roadmap.md#roadmap). What to do when one fires is
+in the [runbook](12-running-and-operating.md#runbook).
 
 | Alert | Condition | Why |
 |---|---|---|
@@ -99,9 +109,15 @@ events rather than percentages.
 
 ## Dashboard layout
 
+📋 **Proposed**, like the alerts.
+
 | Row | Panels |
 |---|---|
 | Adoption | Events this week · Customers reached · Reach rate · Customers skipped |
 | Delivery | Success rate · Retry rate · Failures by error type |
 | Speed | Send time p50 / p95 · Time to notify |
 | Audit | Outbox depth · Oldest waiting event · Events forwarded |
+
+---
+
+← [9. Security threats](09-security-threat-assessment.md) · [Docs index](README.md) · [11. Testing](11-testing.md) →

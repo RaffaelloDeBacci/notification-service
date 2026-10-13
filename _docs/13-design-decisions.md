@@ -8,17 +8,17 @@ and easy to extend, but do not build machinery the problem does not need.**
 
 | # | Decision | In one line |
 |---|---|---|
-| D1 | Hexagonal modules | The compiler keeps business rules separate from technology. |
-| D2 | Accept now, send later (inbox) | Callers never wait for or fail because of e-mail. |
-| D3 | Audit through an outbox to a central archive | No audit record can be lost, and nobody can rewrite history. |
-| D4 | Keep a dispatch ledger as well | Fast answers to "who got what" and no duplicate e-mails. |
-| D5 | Sealed types for message types, plug-ins for channels | The compiler checks the closed list; the open list stays open. |
-| D6 | Store the notification content as JSON | New message types need no database change. |
-| D7 | Lease-based claiming | Safe with several instances and recovers from crashes by itself. |
-| D8 | A simple retry loop | One retry rule does not need a library. |
-| D9 | Idempotency key without content check | Simple, predictable, and enough for trusted callers. |
-| D10 | Contract-first API | Docs and code cannot drift apart. |
-| D11 | Translatable message texts | Wording and languages change without code changes. |
+| [D1](#d1-hexagonal-architecture-in-separate-modules) | Hexagonal modules | The compiler keeps business rules separate from technology. |
+| [D2](#d2-accept-now-send-later) | Accept now, send later (inbox) | Callers never wait for or fail because of e-mail. |
+| [D3](#d3-audit-through-a-transactional-outbox-to-a-central-archive) | Audit through an outbox to a central archive | No audit record can be lost, and nobody can rewrite history. |
+| [D4](#d4-a-dispatch-ledger-next-to-the-audit-trail) | Keep a dispatch ledger as well | Fast answers to "who got what" and no duplicate e-mails. |
+| [D5](#d5-sealed-types-for-message-types-plug-ins-for-channels) | Sealed types for message types, plug-ins for channels | The compiler checks the closed list; the open list stays open. |
+| [D6](#d6-notification-content-stored-as-json) | Store the notification content as JSON | New message types need no database change. |
+| [D7](#d7-lease-based-claiming) | Lease-based claiming | Safe with several instances and recovers from crashes by itself. |
+| [D8](#d8-a-simple-retry-loop) | A simple retry loop | One retry rule does not need a library. |
+| [D9](#d9-idempotency-key-without-a-content-check) | Idempotency key without content check | Simple, predictable, and enough for trusted callers. |
+| [D10](#d10-contract-first-api) | Contract-first API | Docs and code cannot drift apart. |
+| [D11](#d11-translatable-message-texts) | Translatable message texts | Wording and languages change without code changes. |
 
 ---
 
@@ -53,7 +53,7 @@ and easy to extend, but do not build machinery the problem does not need.**
 - **Decision:** write each audit event to an outbox table in the same transaction
   as the change; a relay forwards it to SNS; SNS delivers it to the audit
   service's SQS queue; the central audit service stores it in S3 with Object
-  Lock.
+  Lock ([full journey](08-audit-and-compliance.md#the-journey-of-an-audit-record)).
 - **Alternatives:**
   - An audit table in our own database: easy, but we could edit our own history.
   - Sending straight to SNS: an SNS outage would mean losing events or failing
@@ -103,7 +103,7 @@ and easy to extend, but do not build machinery the problem does not need.**
 
 - **Problem:** if the service crashes while sending, the notification must not be
   stuck forever; and two instances must not send the same notification.
-- **Decision:** one SQL statement claims waiting rows with
+- **Decision** ([how it works](05-how-it-works.md#3-recovering-from-a-crash)): one SQL statement claims waiting rows with
   `FOR UPDATE SKIP LOCKED` and stamps the time. After 5 minutes, a claim
   expires and the row can be picked up again. More than 5 claims means
   something is wrong, and the row is marked `FAILED`.
@@ -116,7 +116,7 @@ and easy to extend, but do not build machinery the problem does not need.**
 ### D8. A simple retry loop
 
 - **Problem:** short mail failures should be retried; permanent ones should not.
-- **Decision:** a small loop: up to 3 tries, a pause that doubles, a little
+- **Decision** ([how it works](05-how-it-works.md#retries)): a small loop: up to 3 tries, a pause that doubles, a little
   randomness, and an immediate stop on permanent errors (bad login, bad address).
 - **Alternative:** Resilience4j. Excellent when you need circuit breakers or rate
   limits; here it only added a dependency and more outcome states.
@@ -162,3 +162,7 @@ and easy to extend, but do not build machinery the problem does not need.**
 | Authentication in the application | The service mesh already does it, consistently for all services. |
 | A Slack sender | Not asked for yet; the extension point is ready and documented. |
 | Open and click tracking | Privacy questions; not needed to prove delivery. |
+
+---
+
+← [12. Running and operating](12-running-and-operating.md) · [Docs index](README.md) · [14. Limitations & roadmap](14-limitations-and-roadmap.md) →

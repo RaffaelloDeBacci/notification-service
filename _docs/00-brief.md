@@ -1,3 +1,11 @@
+# 0. Challenge brief
+
+> **This page is the original challenge brief, kept verbatim** as the source of
+> every requirement. The only change is the message template in FR.1.2, whose
+> placeholders were lost when the brief was copied; it is restored from the
+> sample message. For how each requirement is met, see
+> [Requirements & acceptance](02-requirements-and-acceptance.md).
+
 Notify Different Customers through dedicated eMail Distribution lists
 =====================================================================
 
@@ -17,7 +25,7 @@ Send a message to a customer dedicated distribution list by event.
 
 Message content will use the following template:
 
-, located at , received a on . \[confidence level\]
+`Site {Site Name}, located at {Site Address} received a {Authority Name} {Document Type} on {Date}. [{Confidence Level}%]`
 
 *   **Site Name**: Full manufacturing site name.
 
@@ -124,3 +132,7 @@ Submission Instructions
 =======================
 
 GitHub access or Zip file.
+
+---
+
+[Docs index](README.md) · Next: [1. Overview →](01-overview.md)
