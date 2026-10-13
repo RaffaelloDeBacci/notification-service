@@ -184,12 +184,10 @@ Every error has the same shape:
   `duplicate = true`.
 - Retrying with the **same** idempotency key is always safe.
 
-## Why the API looks like this
+## Design rationale (canonical source)
 
-| Choice | Reason |
-|---|---|
-| `202` and background sending | The caller should not wait for, or fail because of, a mail server. |
-| One endpoint for all message types | Callers use one URL; `messageType` picks the format. New types do not need new URLs. |
-| `PUT` the whole list | Simple for callers and safe to repeat. We work out what changed and audit only that. |
-| Idempotency key from the caller | Only the caller knows whether two requests are "the same event". |
-| Contract first (OpenAPI) | The documentation and the code cannot drift apart. |
+API design choices are explained in [Design decisions](13-design-decisions.md):
+
+- [D2. Accept now, send later](13-design-decisions.md#d2-accept-now-send-later)
+- [D9. Idempotency key without a content check](13-design-decisions.md#d9-idempotency-key-without-a-content-check)
+- [D10. Contract-first API](13-design-decisions.md#d10-contract-first-api)

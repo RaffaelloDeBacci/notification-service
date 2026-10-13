@@ -19,9 +19,9 @@ build next.
 | Messages are only in English | Non-English customers get English | The texts are already in a translation file; adding a language is configuration. |
 | The demo seed data runs in every environment | One demo list in production | Must be limited to a `local` Liquibase context before production. |
 | Local setup uses dummy AWS keys | None locally; a risk if left in production | Production uses IAM roles; listed in the production checklist. |
-| `X-Actor` is optional | A list change without it cannot be traced to a person | The BFF always sets it; making it required is a small change (see [T2](09-security-threat-assessment.md#t2-someone-fakes-the-person-in-x-actor)). |
-| The API accepts up to 1,000 customers per notification | Larger bursts than the documented 50 | The contract's `maxItems` should be 50 (see [T3](09-security-threat-assessment.md#t3-harmful-or-huge-input)). |
-| STARTTLS is not enforced | Mail could go unencrypted if the server does not offer TLS | Needs `mail.smtp.starttls.required` (see [T10](09-security-threat-assessment.md#t10-e-mail-read-or-changed-on-the-way)). |
+
+Detailed code-level security gaps live in one place:
+[Security threat assessment → Mitigation check](09-security-threat-assessment.md#mitigation-check).
 
 ## Roadmap
 

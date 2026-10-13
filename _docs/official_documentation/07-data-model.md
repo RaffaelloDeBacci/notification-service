@@ -116,39 +116,12 @@ A **waiting room** for audit events, not their permanent home.
 - Two small indexes: one for "not yet forwarded" (what the relay reads) and one
   for "forwarded" (what the clean-up reads).
 
-## The life of a notification
+## Notification lifecycle (canonical source)
 
-```mermaid
-stateDiagram-v2
-    [*] --> RECEIVED
-    RECEIVED --> DISPATCHING: picked up
-    DISPATCHING --> DISPATCHING: picked up again after a crash
-    DISPATCHING --> COMPLETED
-    DISPATCHING --> FAILED
-```
+State transitions, claim rules, and crash recovery are defined in
+[How it works](05-how-it-works.md#the-life-of-a-notification).
 
-Only `RECEIVED` notifications, and `DISPATCHING` ones whose 5-minute lease has
-expired, are picked up. This is how FR.1.4 is met: a finished notification is
-never sent again.
-
-Picking up is one SQL statement:
-
-```sql
-UPDATE notification_inbox
-SET    status = 'DISPATCHING', claimed_at = now(), claim_count = claim_count + 1
-WHERE  event_reference IN (
-         SELECT event_reference FROM notification_inbox
-         WHERE  status = 'RECEIVED'
-            OR (status = 'DISPATCHING' AND claimed_at < now() - interval '5 minutes')
-         ORDER  BY created_at
-         LIMIT  50
-         FOR UPDATE SKIP LOCKED)
-RETURNING *;
-```
-
-`FOR UPDATE SKIP LOCKED` means "lock the rows I take, and ignore rows someone
-else has locked". Two copies of the service can run this at the same time and
-never get the same row.
+This page focuses on the storage model that supports that lifecycle.
 
 ## Database changes (Liquibase)
 
