@@ -87,45 +87,67 @@ public class DispatchInboxEventsService implements DispatchInboxUseCase {
 
     private boolean dispatchNotification(NotificationInboxEntry inboxEntry) {
         NotificationRequest request = inboxEntry.request();
-        boolean hasFailures = false;
         RenderedMessage renderedMessage = messageRenderer.render(request);
+        boolean hasFailures = false;
         for (String customerReference : request.affectedCustomerReferences()) {
-            List<DistributionListTarget> targets = distributionListPort.findTargets(customerReference);
-            if (targets.isEmpty()) {
-                LOGGER.warn(
-                        "Skipping customer {} for notification {}: no distribution list configured",
-                        customerReference,
-                        request.idempotencyKey()
-                );
-                notificationMetricsPort.incrementCustomersSkippedWithoutDistributionList();
-                continue;
-            }
-            boolean customerNotified = false;
-            for (DistributionListTarget target : targets) {
-                if (Thread.currentThread().isInterrupted()) {
-                    return hasFailures;
-                }
-                if (dispatchLedgerPort.isDelivered(request.idempotencyKey(), customerReference, target)) {
-                    LOGGER.debug("Skipping {} target for {}: already delivered", target.channel(), request.idempotencyKey());
-                    continue;
-                }
-                boolean delivered = targetDispatcher.deliver(
-                        request.idempotencyKey(),
-                        customerReference,
-                        target,
-                        renderedMessage
-                );
-                notificationInboxPort.renewLease(inboxEntry.eventReference());
-                if (delivered) {
-                    customerNotified = true;
-                } else {
-                    hasFailures = true;
-                }
-            }
-            if (customerNotified) {
-                notificationMetricsPort.incrementCustomersNotified();
+            CustomerDispatchResult result = dispatchToCustomer(inboxEntry, request, customerReference, renderedMessage);
+            hasFailures |= result.hasFailures();
+            if (result.interrupted()) {
+                break;
             }
         }
         return hasFailures;
+    }
+
+    /** Delivers a notification to every target of a single customer's distribution list. */
+    private CustomerDispatchResult dispatchToCustomer(
+            NotificationInboxEntry inboxEntry,
+            NotificationRequest request,
+            String customerReference,
+            RenderedMessage renderedMessage
+    ) {
+        List<DistributionListTarget> targets = distributionListPort.findTargets(customerReference);
+        if (targets.isEmpty()) {
+            LOGGER.warn(
+                    "Skipping customer {} for notification {}: no distribution list configured",
+                    customerReference,
+                    request.idempotencyKey()
+            );
+            notificationMetricsPort.incrementCustomersSkippedWithoutDistributionList();
+            return CustomerDispatchResult.NONE;
+        }
+
+        boolean customerNotified = false;
+        boolean hasFailures = false;
+        for (DistributionListTarget target : targets) {
+            if (Thread.currentThread().isInterrupted()) {
+                return new CustomerDispatchResult(hasFailures, true);
+            }
+            if (dispatchLedgerPort.isDelivered(request.idempotencyKey(), customerReference, target)) {
+                LOGGER.debug("Skipping {} target for {}: already delivered", target.channel(), request.idempotencyKey());
+                continue;
+            }
+            boolean delivered = targetDispatcher.deliver(
+                    request.idempotencyKey(),
+                    customerReference,
+                    target,
+                    renderedMessage
+            );
+            notificationInboxPort.renewLease(inboxEntry.eventReference());
+            if (delivered) {
+                customerNotified = true;
+            } else {
+                hasFailures = true;
+            }
+        }
+
+        if (customerNotified) {
+            notificationMetricsPort.incrementCustomersNotified();
+        }
+        return new CustomerDispatchResult(hasFailures, false);
+    }
+
+    private record CustomerDispatchResult(boolean hasFailures, boolean interrupted) {
+        private static final CustomerDispatchResult NONE = new CustomerDispatchResult(false, false);
     }
 }
