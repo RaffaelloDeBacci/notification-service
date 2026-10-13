@@ -24,12 +24,6 @@ flowchart LR
 
 You need Docker and Java 25.
 
-```bash
-docker compose -f _dev/docker-compose.yml up -d
-./mvnw verify
-java -jar notification-boot/target/notification-boot-0.0.1-SNAPSHOT.jar
-```
-
 For the full local walkthrough (including sample API calls, Mailpit, LocalStack,
 clean reset, and troubleshooting), see
 [Running and operating](_docs/12-running-and-operating.md).
